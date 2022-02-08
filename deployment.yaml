@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: be-echo-deployment
+  labels:
+    app: be-echo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: be-echo
+  template:
+    metadata:
+      labels:
+        app: be-echo
+    spec:
+      containers:
+      - name: echo
+        image: kalmhq/echoserver
+        ports:
+        - containerPort: 8001
+        - containerPort: 8002
+          name: http2-non
+        - containerPort: 8003
+          name: http2-tls
+        - containerPort: 8004
+          name: grpc-non
+        - containerPort: 8005
+          name: grpc-tls
+        - containerPort: 8006
+        volumeMounts:
+          - name: echo-certs
+            mountPath: /workspace/default.pem
+            subPath: default.pem
+            readOnly: true
+          - name: echo-certs
+            mountPath: /workspace/default.key
+            subPath: default.key
+            readOnly: true
+      - name: envoy-sidecar
+        image: 'envoyproxy/envoy:v1.21.0'
+        args:
+          - '-c'
+          - /config/envoy.yaml
+          - '-l'
+          - debug
+          - '--log-path'
+          - dev/stdout 
+        ports:
+          - name: http-auth
+            containerPort: 8080
+            protocol: TCP
+          - containerPort: 12345
+        resources: {}
+        volumeMounts:
+          - name: envoy-config-vol
+            mountPath: /config
+            readOnly: true
+          - name: echo-certs-vol
+            mountPath: /etc/certs
+            readOnly: true
+        imagePullPolicy: IfNotPresent
+      - name: nginx-sidecar
+        image: 'nginx:1.21'
+        ports:
+          - name: http-nginx
+            containerPort: 8081
+            protocol: TCP
+        resources: {}
+        volumeMounts:
+          - name: nginx-config
+            mountPath: /etc/nginx/conf.d
+          - name: echo-certs-vol
+            mountPath: /etc/certs
+            readOnly: true
+        imagePullPolicy: IfNotPresent
+      volumes:
+      - name: echo-certs-vol
+        secret:
+          secretName: be-echo
+      - name: envoy-config-vol
+        configMap:
+          name: envoy-echo
+      - name: nginx-config
+        configMap:
+          name: nginx-echo
+      - name: echo-certs
+        secret:
+          secretName: be-echo
+          items:
+          - key: tls.crt
+            path: default.pem
+          - key: tls.key
+            path: default.key
+

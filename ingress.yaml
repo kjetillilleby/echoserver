@@ -1,0 +1,63 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fe-ingress
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.allow-http: "false"   
+spec:
+  tls:
+  - hosts:
+    - proxy-postgres-backend.example.com
+    secretName: be-echo
+  rules:
+    - host: proxy-postgres-backend.example.com
+      http:
+        paths:
+          - backend:
+              service: 
+                name: be-echo
+                port:
+                  name: http2-non
+            path: /http2/non/*
+            pathType: ImplementationSpecific
+          - backend:
+              service: 
+                name: be-echo
+                port:
+                  name: http2-tls
+            path: /http2/tls/*
+            pathType: ImplementationSpecific
+          - backend:
+              service: 
+                name: be-echo
+                port:
+                  name: grpc-non
+            path: /grpc/non/*
+            pathType: ImplementationSpecific
+          - backend:
+              service: 
+                name: be-echo
+                port:
+                  name: grpc-tls
+            path: /grpc/tls/*
+            pathType: ImplementationSpecific
+          - backend:
+              service: 
+                name: be-echo
+                port:
+                  name: http-nginx
+            path: /nginx/*
+            pathType: ImplementationSpecific
+          - backend:
+              service: 
+                name: be-echo
+                port:
+                  name: http-auth
+            path: /*
+            pathType: ImplementationSpecific
+  defaultBackend:
+    service:
+      name: be-echo
+      port: 
+        name: http-auth

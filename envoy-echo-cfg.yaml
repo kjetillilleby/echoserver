@@ -1,0 +1,70 @@
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 12345
+
+static_resources:
+  listeners:
+  - name: echo_listener
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 8080
+    listener_filters:
+    - name: "envoy.filters.listener.tls_inspector"
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: echo_tcp
+          cluster: echo_cluster
+          access_log:
+          - name: envoy.access_loggers.stdout
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          require_client_certificate: true
+          common_tls_context:
+            alpn_protocols: 
+            - h2
+            tls_certificates:
+            - certificate_chain:
+                filename: /etc/certs/tls.crt
+              private_key:
+                filename: /etc/certs/tls.key
+            validation_context:
+              match_typed_subject_alt_names:
+              - san_type: DNS
+                matcher:
+                  exact: proxy-postgres-frontend.example.com
+              trusted_ca:
+                filename: /etc/certs/ca.crt
+
+  clusters:
+  - name: echo_cluster
+    type: STRICT_DNS
+    connect_timeout: 650s
+    upstream_connection_options:
+      tcp_keepalive:
+        keepalive_time: 650 
+    load_assignment:
+      cluster_name: echo_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: be-echo
+                port_value: 8003
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        common_tls_context:
+          alpn_protocols: 
+          - h2
